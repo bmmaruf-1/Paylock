@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Full Custom EMI Manager</title>
+<style>
+  * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+  body { background-color: #0f172a; color: #f8fafc; margin: 0; padding: 15px; }
+  
+  .header { border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 15px; }
+  .header h2 { margin: 0; color: #38bdf8; font-size: 18px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+  .stat-card { background: #1e293b; padding: 12px; border-radius: 10px; border: 1px solid #334155; text-align: center; }
+  .stat-card p { margin: 0; font-size: 11px; color: #94a3b8; }
+  .stat-card h3 { margin: 5px 0 0 0; font-size: 16px; color: #f1f5f9; }
+
+  .card { background: #1e293b; padding: 15px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 15px; }
+  .card h3 { margin-top: 0; font-size: 15px; color: #e2e8f0; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+
+  label { font-size: 11px; color: #94a3b8; display: block; margin-bottom: 4px; }
+  input, textarea { width: 100%; background: #0f172a; border: 1px solid #475569; color: white; padding: 8px; border-radius: 6px; font-size: 12px; margin-bottom: 8px; resize: none; }
+  
+  .btn { width: 100%; padding: 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; margin-top: 5px; }
+  .btn-add { background: #0284c7; color: white; }
+  .btn-lock { background: #dc2626; color: white; padding: 6px; font-size: 11px; }
+  .btn-unlock { background: #16a34a; color: white; padding: 6px; font-size: 11px; }
+  .btn-delete { background: #64748b; color: white; padding: 6px; font-size: 11px; margin-top: 4px; }
+
+  /* Customer List */
+  .customer-item { background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #334155; }
+  .cust-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; color: #38bdf8; }
+  .cust-details { font-size: 11px; color: #94a3b8; margin: 5px 0; }
+  .action-btns { display: flex; gap: 5px; margin-top: 8px; }
+
+  /* Virtual Screen */
+  .phone-screen { background: #020617; border: 2px solid #38bdf8; border-radius: 12px; padding: 15px; text-align: center; margin-top: 10px; transition: all 0.3s ease; }
+  .phone-msg { font-size: 13px; margin-top: 10px; color: #4ade80; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>⚡ PayLock শপ ম্যানেজার (কাস্টম মেসেজ সহ)</h2>
+  </div>
+
+  <!-- ড্যাশবোর্ড কাউন্টার -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <p>মোট যুক্তকৃত ফোন</p>
+      <h3 id="totalCount">১ টি</h3>
+    </div>
+    <div class="stat-card">
+      <p>লক করা ফোন</p>
+      <h3 id="lockedCount" style="color: #f87171;">০ টি</h3>
+    </div>
+  </div>
+
+  <!-- কাস্টম মেসেজ সেটিং -->
+  <div class="card">
+    <h3>✉️ লক নোটিশ বা মেসেজ লিখুন</h3>
+    <label>ফোন লক করার সময় কাস্টমারের স্ক্রিনে যে মেসেজটি দেখাতে চান:</label>
+    <textarea id="customLockMsg" rows="2">⚠️ আপনার কিস্তির টাকা বকেয়া রয়েছে! অনতিবিলম্বে দোকানে যোগাযোগ করে পেমেন্ট সম্পন্ন করুন।</textarea>
+  </div>
+
+  <!-- কাস্টমার যোগ করার ফর্ম -->
+  <div class="card">
+    <h3>➕ নতুন কাস্টমার ও ফোন যুক্ত করুন</h3>
+    <input type="text" id="custName" placeholder="কাস্টমারের নাম">
+    <input type="text" id="phoneModel" placeholder="মোবাইল মডেল (যেমন: Redmi Note 12)">
+    <input type="number" id="emiAmount" placeholder="বকেয়া কিস্তির পরিমাণ (টাকা)">
+    <button class="btn btn-add" onclick="addCustomer()">কাস্টমার তালিকায় সেভ করুন</button>
+  </div>
+
+  <!-- কাস্টমার লিস্ট -->
+  <div class="card">
+    <h3>📋 কাস্টমার ও ডিভাইস তালিকা</h3>
+    <div id="customerContainer">
+      
+      <!-- ডিফল্ট কাস্টমার ১ -->
+      <div class="customer-item" id="cust-1">
+        <div class="cust-header">
+          <span>রহিম আহমেদ</span>
+          <span style="color: #4ade80;" id="status-1">সক্রিয়</span>
+        </div>
+        <div class="cust-details">
+          📱 Samsung A14 | 💰 বকেয়া: ৳২৫০০
+        </div>
+        <div class="action-btns">
+          <button class="btn btn-lock" onclick="lockCust('cust-1', 'status-1', 'রহিম আহমেদ')">🔒 কাস্টম মেসেজে লক</button>
+          <button class="btn btn-unlock" onclick="unlockCust('cust-1', 'status-1')">🔓 আনলক</button>
+        </div>
+        <button class="btn btn-delete" onclick="deleteCust('cust-1')">✅ কিস্তি পরিশোধিত (ডিলিট করুন)</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- লাইভ স্ক্রিন প্রিভিউ -->
+  <div class="card">
+    <h3>📱 কাস্টমারের লাইভ স্ক্রিন প্রিভিউ</h3>
+    <div class="phone-screen" id="virtualPhone">
+      <div id="activePhoneName" style="font-size: 11px; color: #64748b;">Samsung Galaxy A14</div>
+      <div class="phone-msg" id="phoneStatusText">ফোনটি স্বাভাবিকভাবে চলছে</div>
+    </div>
+  </div>
+
+<script>
+  var totalDevices = 1;
+  var lockedDevices = 0;
+  var custIdCounter = 2;
+
+  // কাস্টমার যোগ করার ফাংশন
+  function addCustomer() {
+    var name = document.getElementById('custName').value;
+    var model = document.getElementById('phoneModel').value;
+    var amount = document.getElementById('emiAmount').value;
+
+    if(name === "" || model === "") {
+      alert("দয়া করে কাস্টমারের নাম এবং মোবাইল মডেল লিখুন!");
+      return;
+    }
+
+    var container = document.getElementById('customerContainer');
+    var currentId = 'cust-' + custIdCounter;
+    var statusId = 'status-' + custIdCounter;
+
+    var newItem = `
+      <div class="customer-item" id="${currentId}">
+        <div class="cust-header">
+          <span>${name}</span>
+          <span style="color: #4ade80;" id="${statusId}">সক্রিয়</span>
+        </div>
+        <div class="cust-details">
+          📱 ${model} | 💰 বকেয়া: ৳${amount}
+        </div>
+        <div class="action-btns">
+          <button class="btn btn-lock" onclick="lockCust('${currentId}', '${statusId}', '${name}')">🔒 কাস্টম মেসেজে লক</button>
+          <button class="btn btn-unlock" onclick="unlockCust('${currentId}', '${statusId}')">🔓 আনলক</button>
+        </div>
+        <button class="btn btn-delete" onclick="deleteCust('${currentId}')">✅ কিস্তি পরিশোধিত (ডিলিট করুন)</button>
+      </div>
+    `;
+
+    container.innerHTML += newItem;
+    
+    // ফর্ম ক্লিয়ার
+    document.getElementById('custName').value = "";
+    document.getElementById('phoneModel').value = "";
+    document.getElementById('emiAmount').value = "";
+
+    totalDevices++;
+    custIdCounter++;
+    updateStats();
+  }
+
+  // কাস্টম মেসেজ সহ লক করার ফাংশন
+  function lockCust(itemId, statusId, name) {
+    var userCustomMsg = document.getElementById('customLockMsg').value;
+
+    document.getElementById(statusId).innerText = "লকড";
+    document.getElementById(statusId).style.color = "#f87171";
+    
+    var screen = document.getElementById('virtualPhone');
+    screen.style.borderColor = "#ef4444";
+    screen.style.background = "#450a0a";
+    
+    document.getElementById('activePhoneName').innerText = name + "-এর ফোন";
+    document.getElementById('phoneStatusText').innerText = userCustomMsg;
+    document.getElementById('phoneStatusText').style.color = "#fca5a5";
+
+    lockedDevices++;
+    updateStats();
+  }
+
+  // আনলক করার ফাংশন
+  function unlockCust(itemId, statusId) {
+    document.getElementById(statusId).innerText = "সক্রিয়";
+    document.getElementById(statusId).style.color = "#4ade80";
+    
+    var screen = document.getElementById('virtualPhone');
+    screen.style.borderColor = "#38bdf8";
+    screen.style.background = "#020617";
+    
+    document.getElementById('phoneStatusText').innerText = "ফোনটি স্বাভাবিকভাবে চলছে";
+    document.getElementById('phoneStatusText').style.color = "#4ade80";
+
+    if(lockedDevices > 0) lockedDevices--;
+    updateStats();
+  }
+
+  // ডিলিট/পরিশোধের ফাংশন
+  function deleteCust(itemId) {
+    if(confirm("কাস্টমার কি সম্পূর্ণ কিস্তি পরিশোধ করেছেন? তালিকা থেকে ডিলিট করা হবে।")) {
+      var item = document.getElementById(itemId);
+      item.remove();
+      totalDevices--;
+      updateStats();
+    }
+  }
+
+  // কাউন্টার আপডেট
+  function updateStats() {
+    document.getElementById('totalCount').innerText = totalDevices + " টি";
+    document.getElementById('lockedCount').innerText = lockedDevices + " টি";
+  }
+</script>
+
+</body>
+</html>
